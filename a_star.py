@@ -1,6 +1,18 @@
+"""
+A* grid planning
+author: Atsushi Sakai(@Atsushi_twi)
+        Nikos Kanargias (nkana@tee.gr)
+See Wikipedia article (https://en.wikipedia.org/wiki/A*_search_algorithm)
+"""
+
 import math
 
 import matplotlib.pyplot as plt
+
+import random
+
+from itertools import cycle
+cycol = cycle('bgrcmk')
 
 show_animation = True
 
@@ -10,7 +22,6 @@ class AStarPlanner:
     def __init__(self, ox, oy, reso, rr):
         """
         Initialize grid map for a star planning
-
         ox: x position list of Obstacles [m]
         oy: y position list of Obstacles [m]
         reso: grid resolution [m]
@@ -33,27 +44,27 @@ class AStarPlanner:
             return str(self.x) + "," + str(self.y) + "," + str(
                 self.cost) + "," + str(self.pind)
 
-    def planning(self, sx, sy, gx, gy):
+    def planning(self, sx, sy, gx, gy, list_of_start_pos):
         """
         A star path search
-
         input:
             sx: start x position [m]
             sy: start y position [m]
             gx: goal x position [m]
             gy: goal y position [m]
-
         output:
             rx: x position list of the final path
             ry: y position list of the final path
         """
-
+        open_set, closed_set = dict(), dict()
+        for pos in (list_of_start_pos):
+            n = self.Node(self.calc_xyindex(pos[0], self.minx), self.calc_xyindex(pos[1], self.miny), 0.0, -1)
+            open_set[self.calc_grid_index(n)] = n
         nstart = self.Node(self.calc_xyindex(sx, self.minx),
                            self.calc_xyindex(sy, self.miny), 0.0, -1)
         ngoal = self.Node(self.calc_xyindex(gx, self.minx),
                           self.calc_xyindex(gy, self.miny), 0.0, -1)
 
-        open_set, closed_set = dict(), dict()
         open_set[self.calc_grid_index(nstart)] = nstart
 
         while 1:
@@ -63,9 +74,8 @@ class AStarPlanner:
 
             c_id = min(
                 open_set,
-                key=lambda o: open_set[o].cost + self.calc_heuristic(ngoal,
-                                                                     open_set[
-                                                                         o]))
+                key=lambda o: open_set[o].cost + self.calc_heuristic(open_set[o],open_set[o]))
+            # print(c_id)
             current = open_set[c_id]
 
             # show graph
@@ -107,10 +117,11 @@ class AStarPlanner:
 
                 if n_id not in open_set:
                     open_set[n_id] = node  # discovered a new node
-                else:
-                    if open_set[n_id].cost > node.cost:
-                        # This path is the best until now. record it
-                        open_set[n_id] = node
+                #print(node)
+                # else:
+                #     if open_set[n_id].cost > node.cost:
+                #         # This path is the best until now. record it
+                #         open_set[n_id] = node
 
         rx, ry = self.calc_final_path(ngoal, closed_set)
 
@@ -138,7 +149,6 @@ class AStarPlanner:
     def calc_grid_position(self, index, minp):
         """
         calc grid position
-
         :param index:
         :param minp:
         :return:
@@ -214,24 +224,28 @@ class AStarPlanner:
 
         return motion
 
+def three(sx, sy, tlen):
+    for i in range(sx, sx+tlen):
+        ox.append(i)
+        oy.append(50.0)
+    # -1-
+    for i in range(0, 10):
+        ox.append(sx)
+        oy.append(sy - i)
+    for i in range(sx, sx+tlen):
+        ox.append(i)
+        oy.append(sy - tlen)
+    for i in range(sx, sx+tlen):
+        ox.append(10)
+        oy.append(40 - i)
+    for i in range(0, 11):
+        ox.append(i)
+        oy.append(30.0)
 
 def main():
     print(__file__ + " start!!")
 
-    # start and goal position
-    # sx = 10.0  # [m]
-    # sy = 10.0  # [m]
-    # gx = 50.0  # [m]
-    # gy = 50.0  # [m]
-    # grid_size = 2.0  # [m]
-    # robot_radius = 1.0  # [m]
 
-    sx = 10 # [m]
-    sy = 10  # [m]
-    gx = 50.0  # [m]
-    gy = 50.0  # [m]
-    grid_size = 1.0  # [m]
-    robot_radius = 2.0  # [m]
     # set obstable positions
     ox, oy = [], []
     for i in range(0, 100):
@@ -248,20 +262,20 @@ def main():
         oy.append(i)
     #3
     #--
-    for i in range(0, 10):
+    for i in range(5, 15):
         ox.append(i)
         oy.append(50.0)
     # -1-
     for i in range(0, 10):
-        ox.append(10)
+        ox.append(15)
         oy.append(50 - i)
-    for i in range(0, 10):
+    for i in range(5, 15):
         ox.append(i)
         oy.append(40.0)
     for i in range(0, 10):
-        ox.append(10)
+        ox.append(15)
         oy.append(40 - i)
-    for i in range(0, 11):
+    for i in range(4, 15):
         ox.append(i)
         oy.append(30.0)
     #7
@@ -290,17 +304,23 @@ def main():
     for i in range(0, 20):
         ox.append(90 - i)
         oy.append(50 - i)
-
-
+    sx = 40  # [m]
+    sy = 40  # [m]
+    list_pos = [(50, 70), (80, 90)]
+    gx = 50.0  # [m]
+    gy = 50.0  # [m]
+    grid_size = 2.0  # [m]
+    robot_radius = 1.0  # [m]
     if show_animation:  # pragma: no cover
         plt.plot(ox, oy, ".k")
         plt.plot(sx, sy, "og")
+        for pos in (list_pos):
+            plt.plot(pos[0], pos[1], c=next(cycol), marker="o")
         plt.plot(gx, gy, "xb")
         plt.grid(True)
         plt.axis("equal")
-
     a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
-    rx, ry = a_star.planning(sx, sy, gx, gy)
+    rx, ry = a_star.planning(sx, sy, gx, gy, list_pos)
 
     if show_animation:  # pragma: no cover
         plt.plot(rx, ry, "-r")
