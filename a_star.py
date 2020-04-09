@@ -80,9 +80,11 @@ class AStarPlanner:
                 # for stopping simulation with the esc key.
                 plt.gcf().canvas.mpl_connect('key_release_event',lambda event: [exit(0) if event.key == 'escape' else None])
                 if len(closed_set) % 10 == 0:
-                    plt.pause(0.001)
-            #if current.x == ngoal.x and current.y == ngoal.y and current.collected>= 1:
-            if current.collected>= 1:
+                    plt.pause(0.000001)
+            #current.x == ngoal.x and current.y == ngoal.y and current.collected>= 1:
+            if len(list_collectables) == 1 and (current.x == ngoal.x and current.y == ngoal.y):
+                print(current.collected)
+            #if current.collected>= 1:
                 print("Find goal")
                 ngoal.pind = current.pind
                 break
@@ -102,7 +104,7 @@ class AStarPlanner:
 
                 # If the node is not safe, do nothing
 
-                if self.verify_node(node, list_collectables, self.motion[i][2]) and (n_id not in visited_ids):
+                if (n_id not in visited_ids) and self.verify_node(node, list_collectables, self.motion[i][2]):
                     open_set.append(node)  # discovered a new node
                     visited_ids.append(node.pind)
                     closed_set.append(current)
@@ -169,10 +171,8 @@ class AStarPlanner:
         if collect and not((px, py) in collectables_list):
             return False
         if collect and ((px, py) in collectables_list):
-            #print("collected")
-            #print(node)
-            #print(node.pind)
-            self.found = True
+            collectables_list.remove((px, py))
+            print(collectables_list)
         #print(True)
 
         return True
