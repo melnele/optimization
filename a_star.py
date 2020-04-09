@@ -34,17 +34,17 @@ class AStarPlanner:
         self.motion = self.get_motion_model()
 
     class Node:
-        def __init__(self, x, y, cost, pind):
+        def __init__(self, x, y, collected, pind, parent):
             self.x = x  # index of grid
             self.y = y  # index of grid
-            self.cost = cost
             self.pind = pind
+            self.parent = parent
+            self.collected = collected
 
         def __str__(self):
-            return str(self.x) + "," + str(self.y) + "," + str(
-                self.cost) + "," + str(self.pind)
+            return str(self.x) + "," + str(self.y) + "," + str(self.pind) + "," + str(self.collected)
 
-    def planning(self, sx, sy, gx, gy, list_of_start_pos):
+    def planning(self, sx, sy, gx, gy, list_of_start_pos, list_collectables):
         """
         A star path search
         input:
@@ -56,72 +56,59 @@ class AStarPlanner:
             rx: x position list of the final path
             ry: y position list of the final path
         """
-        open_set, closed_set = dict(), dict()
+        open_set, closed_set, visited_ids = [], [], []
         for pos in (list_of_start_pos):
-            n = self.Node(self.calc_xyindex(pos[0], self.minx), self.calc_xyindex(pos[1], self.miny), 0.0, -1)
-            open_set[self.calc_grid_index(n)] = n
+            n = self.Node(self.calc_xyindex(pos[0], self.minx), self.calc_xyindex(pos[1], self.miny) , 0, -1, None)
+            open_set.append(n)
         nstart = self.Node(self.calc_xyindex(sx, self.minx),
-                           self.calc_xyindex(sy, self.miny), 0.0, -1)
+                           self.calc_xyindex(sy, self.miny), 0, -1, None)
         ngoal = self.Node(self.calc_xyindex(gx, self.minx),
-                          self.calc_xyindex(gy, self.miny), 0.0, -1)
+                          self.calc_xyindex(gy, self.miny), 0, -1, None)
 
-        open_set[self.calc_grid_index(nstart)] = nstart
-
+        open_set.append(nstart)
+        visited_ids.append(nstart.pind)
         while 1:
             if len(open_set) == 0:
                 print("Open set is empty..")
                 break
 
-            c_id = min(
-                open_set,
-                key=lambda o: open_set[o].cost + self.calc_heuristic(open_set[o],open_set[o]))
-            # print(c_id)
-            current = open_set[c_id]
+            c_id = 0
+            current = open_set.pop(c_id)
 
             # show graph
             if show_animation:  # pragma: no cover
                 plt.plot(self.calc_grid_position(current.x, self.minx),
                          self.calc_grid_position(current.y, self.miny), "xc")
                 # for stopping simulation with the esc key.
-                plt.gcf().canvas.mpl_connect('key_release_event',
-                                             lambda event: [exit(
-                                                 0) if event.key == 'escape' else None])
-                if len(closed_set.keys()) % 10 == 0:
+                plt.gcf().canvas.mpl_connect('key_release_event',lambda event: [exit(0) if event.key == 'escape' else None])
+                if len(closed_set) % 10 == 0:
                     plt.pause(0.001)
 
-            if current.x == ngoal.x and current.y == ngoal.y:
+            if current.x == ngoal.x and current.y == ngoal.y: #and current.collected>= 1:
                 print("Find goal")
                 ngoal.pind = current.pind
-                ngoal.cost = current.cost
                 break
 
-            # Remove the item from the open set
-            del open_set[c_id]
-
             # Add it to the closed set
-            closed_set[c_id] = current
+            
 
             # expand_grid search grid based on motion model
             for i, _ in enumerate(self.motion):
-                node = self.Node(current.x + self.motion[i][0],
-                                 current.y + self.motion[i][1],
-                                 current.cost + self.motion[i][2], c_id)
+                node = None
+                if(self.motion[i][2]):
+                    node = self.Node(current.x + self.motion[i][0], current.y + self.motion[i][1], current.collected + 1, 0, current)
+                else:
+                    node = self.Node(current.x + self.motion[i][0], current.y + self.motion[i][1], current.collected, 0, current)
                 n_id = self.calc_grid_index(node)
+                node.pind = n_id
 
                 # If the node is not safe, do nothing
-                if not self.verify_node(node):
-                    continue
 
-                if n_id in closed_set:
-                    continue
-
-                if n_id not in open_set:
-                    open_set[n_id] = node  # discovered a new node
-                #print(node)
-                # else:
-                #     if open_set[n_id].cost > node.cost:
-                #         # This path is the best until now. record it
-                #         open_set[n_id] = node
+                if n_id not in visited_ids and self.verify_node(node, list_collectables, self.motion[i][2]):
+                    #print(node)
+                    open_set.append(node)  # discovered a new node
+                    visited_ids.append(node.pind)
+                    closed_set.append(current)
 
         rx, ry = self.calc_final_path(ngoal, closed_set)
 
@@ -132,11 +119,14 @@ class AStarPlanner:
         rx, ry = [self.calc_grid_position(ngoal.x, self.minx)], [
             self.calc_grid_position(ngoal.y, self.miny)]
         pind = ngoal.pind
+        print(len(closedset))
+        #parent = closedset[-1].parent
         while pind != -1:
-            n = closedset[pind]
+            n = closedset.pop(-1)
             rx.append(self.calc_grid_position(n.x, self.minx))
             ry.append(self.calc_grid_position(n.y, self.miny))
             pind = n.pind
+           # parent = n.parent
 
         return rx, ry
 
@@ -162,10 +152,9 @@ class AStarPlanner:
     def calc_grid_index(self, node):
         return (node.y - self.miny) * self.xwidth + (node.x - self.minx)
 
-    def verify_node(self, node):
+    def verify_node(self, node, collectables_list, collect):
         px = self.calc_grid_position(node.x, self.minx)
         py = self.calc_grid_position(node.y, self.miny)
-
         if px < self.minx:
             return False
         elif py < self.miny:
@@ -177,6 +166,8 @@ class AStarPlanner:
 
         # collision check
         if self.obmap[node.x][node.y]:
+            return False
+        if collect and not((px, py) in collectables_list):
             return False
 
         return True
@@ -213,14 +204,15 @@ class AStarPlanner:
     @staticmethod
     def get_motion_model():
         # dx, dy, cost
-        motion = [[1, 0, 1],
-                  [0, 1, 1],
-                  [-1, 0, 1],
-                  [0, -1, 1],
-                  [-1, -1, math.sqrt(2)],
-                  [-1, 1, math.sqrt(2)],
-                  [1, -1, math.sqrt(2)],
-                  [1, 1, math.sqrt(2)]]
+        motion = [[1, 0, False],
+                  [0, 1, False],
+                  [-1, 0, False],
+                  [0, -1, False],
+                  [-1, -1,False],
+                  [-1, 1, False],
+                  [1, -1, False],
+                  [1, 1, False],
+                  [0, 0, True]]
 
         return motion
 
@@ -304,23 +296,27 @@ def main():
     for i in range(0, 20):
         ox.append(90 - i)
         oy.append(50 - i)
-    sx = 40  # [m]
-    sy = 40  # [m]
-    list_pos = [(50, 70), (80, 90)]
+    sx = 70  # [m]
+    sy = 70  # [m]
+    #list_pos = [(20, 20), (60, 60)]
+    list_pos = []
+    list_collectables = [(50, 50), (30, 30)]
     gx = 50.0  # [m]
     gy = 50.0  # [m]
     grid_size = 2.0  # [m]
     robot_radius = 1.0  # [m]
     if show_animation:  # pragma: no cover
         plt.plot(ox, oy, ".k")
-        plt.plot(sx, sy, "og")
+        plt.plot(sx, sy, "oy")
         for pos in (list_pos):
             plt.plot(pos[0], pos[1], c=next(cycol), marker="o")
-        plt.plot(gx, gy, "xb")
+        for x,y in list_collectables:
+            plt.plot(x, y, c=next(cycol), marker="v")
+        plt.plot(gx, gy, c="r", marker="$g$")
         plt.grid(True)
         plt.axis("equal")
     a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
-    rx, ry = a_star.planning(sx, sy, gx, gy, list_pos)
+    rx, ry = a_star.planning(sx, sy, gx, gy, list_pos, list_collectables)
 
     if show_animation:  # pragma: no cover
         plt.plot(rx, ry, "-r")
