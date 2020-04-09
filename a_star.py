@@ -45,7 +45,7 @@ class AStarPlanner:
         def __str__(self):
             return str(self.x) + "," + str(self.y) + "," + str(self.pind) + "," + str(self.collected)
 
-    def planning(self, sx, sy, gx, gy, list_of_start_pos, list_collectables):
+    def planning(self, gx, gy, list_of_start_pos, list_collectables):
         """
         A star path search
         input:
@@ -58,14 +58,12 @@ class AStarPlanner:
             ry: y position list of the final path
         """
         open_set, closed_set, visited_ids = [], [], []
-        for pos in (list_of_start_pos):
-            n = self.Node(self.calc_xyindex(pos[0], self.minx), self.calc_xyindex(pos[1], self.miny) , 0, -1, None)
+        for x,y in list_of_start_pos:
+            n = self.Node(self.calc_xyindex(x, self.minx), self.calc_xyindex(y, self.miny) , 0, -1, None)
             open_set.append(n)
-        nstart = self.Node(self.calc_xyindex(sx, self.minx), self.calc_xyindex(sy, self.miny), 0, -1, None)
+            visited_ids.append(n.pind)
         ngoal = self.Node(self.calc_xyindex(gx, self.minx), self.calc_xyindex(gy, self.miny), 0, -1, None)
 
-        open_set.append(nstart)
-        visited_ids.append(nstart.pind)
         while 1:
             if len(open_set) == 0:
                 print("Open set is empty..")
@@ -80,9 +78,8 @@ class AStarPlanner:
                 # for stopping simulation with the esc key.
                 plt.gcf().canvas.mpl_connect('key_release_event',lambda event: [exit(0) if event.key == 'escape' else None])
                 if len(closed_set) % 10 == 0:
-                    plt.pause(0.000001)
-            #current.x == ngoal.x and current.y == ngoal.y and current.collected>= 1:
-            if len(list_collectables) == 1 and (current.x == ngoal.x and current.y == ngoal.y):
+                    plt.pause(0.001)
+            if len(list_collectables) == 0 and (current.x == ngoal.x and current.y == ngoal.y):
                 print(current.collected)
             #if current.collected>= 1:
                 print("Find goal")
@@ -303,8 +300,8 @@ def main():
         oy.append(50 - i)
     sx = 70  # [m]
     sy = 70  # [m]
-    #list_pos = [(20, 20), (60, 60)]
-    list_pos = []
+    list_pos = [(70, 70), (20, 20), (60, 60)]
+    #list_pos = []
     list_collectables = [(60, 80), (30, 30)]
     gx = 50.0  # [m]
     gy = 50.0  # [m]
@@ -312,7 +309,7 @@ def main():
     robot_radius = 1.0  # [m]
     if show_animation:  # pragma: no cover
         plt.plot(ox, oy, ".k")
-        plt.plot(sx, sy, "oy")
+        #plt.plot(sx, sy, "oy")
         for pos in (list_pos):
             plt.plot(pos[0], pos[1], c=next(cycol), marker="o")
         for x,y in list_collectables:
@@ -321,7 +318,7 @@ def main():
         plt.grid(True)
         plt.axis("equal")
     a_star = AStarPlanner(ox, oy, grid_size, robot_radius)
-    rx, ry = a_star.planning(sx, sy, gx, gy, list_pos, list_collectables)
+    rx, ry = a_star.planning(gx, gy, list_pos, list_collectables)
 
     if show_animation:  # pragma: no cover
         plt.plot(rx, ry, "-r")
