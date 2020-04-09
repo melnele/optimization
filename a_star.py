@@ -32,6 +32,7 @@ class AStarPlanner:
         self.rr = rr
         self.calc_obstacle_map(ox, oy)
         self.motion = self.get_motion_model()
+        self.found = False
 
     class Node:
         def __init__(self, x, y, collected, pind, parent):
@@ -60,10 +61,8 @@ class AStarPlanner:
         for pos in (list_of_start_pos):
             n = self.Node(self.calc_xyindex(pos[0], self.minx), self.calc_xyindex(pos[1], self.miny) , 0, -1, None)
             open_set.append(n)
-        nstart = self.Node(self.calc_xyindex(sx, self.minx),
-                           self.calc_xyindex(sy, self.miny), 0, -1, None)
-        ngoal = self.Node(self.calc_xyindex(gx, self.minx),
-                          self.calc_xyindex(gy, self.miny), 0, -1, None)
+        nstart = self.Node(self.calc_xyindex(sx, self.minx), self.calc_xyindex(sy, self.miny), 0, -1, None)
+        ngoal = self.Node(self.calc_xyindex(gx, self.minx), self.calc_xyindex(gy, self.miny), 0, -1, None)
 
         open_set.append(nstart)
         visited_ids.append(nstart.pind)
@@ -77,14 +76,13 @@ class AStarPlanner:
 
             # show graph
             if show_animation:  # pragma: no cover
-                plt.plot(self.calc_grid_position(current.x, self.minx),
-                         self.calc_grid_position(current.y, self.miny), "xc")
+                plt.plot(self.calc_grid_position(current.x, self.minx), self.calc_grid_position(current.y, self.miny), "xc")
                 # for stopping simulation with the esc key.
                 plt.gcf().canvas.mpl_connect('key_release_event',lambda event: [exit(0) if event.key == 'escape' else None])
                 if len(closed_set) % 10 == 0:
                     plt.pause(0.001)
-
-            if current.x == ngoal.x and current.y == ngoal.y: #and current.collected>= 1:
+            #if current.x == ngoal.x and current.y == ngoal.y and current.collected>= 1:
+            if current.collected>= 1:
                 print("Find goal")
                 ngoal.pind = current.pind
                 break
@@ -99,13 +97,12 @@ class AStarPlanner:
                     node = self.Node(current.x + self.motion[i][0], current.y + self.motion[i][1], current.collected + 1, 0, current)
                 else:
                     node = self.Node(current.x + self.motion[i][0], current.y + self.motion[i][1], current.collected, 0, current)
-                n_id = self.calc_grid_index(node)
+                n_id = str(self.calc_grid_index(node))+","+str(node.collected)
                 node.pind = n_id
 
                 # If the node is not safe, do nothing
 
-                if n_id not in visited_ids and self.verify_node(node, list_collectables, self.motion[i][2]):
-                    #print(node)
+                if self.verify_node(node, list_collectables, self.motion[i][2]) and (n_id not in visited_ids):
                     open_set.append(node)  # discovered a new node
                     visited_ids.append(node.pind)
                     closed_set.append(current)
@@ -155,6 +152,7 @@ class AStarPlanner:
     def verify_node(self, node, collectables_list, collect):
         px = self.calc_grid_position(node.x, self.minx)
         py = self.calc_grid_position(node.y, self.miny)
+        #print(collect)
         if px < self.minx:
             return False
         elif py < self.miny:
@@ -167,8 +165,15 @@ class AStarPlanner:
         # collision check
         if self.obmap[node.x][node.y]:
             return False
+        # collection
         if collect and not((px, py) in collectables_list):
             return False
+        if collect and ((px, py) in collectables_list):
+            #print("collected")
+            #print(node)
+            #print(node.pind)
+            self.found = True
+        #print(True)
 
         return True
 
@@ -300,7 +305,7 @@ def main():
     sy = 70  # [m]
     #list_pos = [(20, 20), (60, 60)]
     list_pos = []
-    list_collectables = [(50, 50), (30, 30)]
+    list_collectables = [(60, 80), (30, 30)]
     gx = 50.0  # [m]
     gy = 50.0  # [m]
     grid_size = 2.0  # [m]
