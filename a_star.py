@@ -49,8 +49,6 @@ class AStarPlanner:
         """
         A star path search
         input:
-            sx: start x position [m]
-            sy: start y position [m]
             gx: goal x position [m]
             gy: goal y position [m]
         output:
@@ -81,7 +79,6 @@ class AStarPlanner:
                     plt.pause(0.001)
             if len(list_collectables) == 0 and (current.x == ngoal.x and current.y == ngoal.y):
                 print(current.collected)
-            #if current.collected>= 1:
                 print("Find goal")
                 ngoal.pind = current.pind
                 break
@@ -300,7 +297,7 @@ def main():
         oy.append(50 - i)
     sx = 70  # [m]
     sy = 70  # [m]
-    list_pos = [(70, 70), (20, 20), (60, 60)]
+    list_pos = [(70, 70), (20, 20), (60, 60), (90, 90)]
     #list_pos = []
     list_collectables = [(60, 80), (30, 30)]
     gx = 50.0  # [m]
@@ -327,3 +324,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+#s
