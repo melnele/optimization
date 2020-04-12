@@ -17,7 +17,13 @@ cycol = cycle('bgrcmk')
 show_animation = True
 
 goal = (50,50)
-
+list_collectables = [(60, 80), (30, 30), (10,60)]
+list_enemies = [(10 , 20), (80 , 15), (20 , 70), (60 , 10), (62, 82),
+                (13 , 23), (82 , 18), (38 , 60), (64 , 30), (64, 92),
+                (16 , 26), (84 , 20), (35 , 44), (68 , 40), (60, 95),
+                (20 , 30), (87 , 30), (40 , 54), (57 , 20), (65, 75),
+                (26 , 37), (92 , 42), (48 , 63), (53 , 50), (69, 65),
+                (29 , 41), (94 , 8), (50 , 74), (33 , 60), (72, 90)]
 
 # 1) Randomly initialize populations p
 # 2) Determine fitness of population
@@ -37,35 +43,42 @@ class Chromosome:
         
     def __str__(self):
         return str(self.node) + " -- collected = " + str(self.collected) + " -- health = " + str(self.health) + " -- fitness = " + str(self.fitness)
-        
-    # def verify(self, node, collectables_list):
-    #     px = self.calc_grid_position(node.x, self.minx)
-    #     py = self.calc_grid_position(node.y, self.miny)
-        
-    #     if px < self.minx:
-    #         return False
-    #     elif py < self.miny:
-    #         return False
-    #     elif px >= self.maxx:
-    #         return False
-    #     elif py >= self.maxy:
-    #         return False
-
-    #     # collision check
-    #     if self.obmap[node.x][node.y]:
-    #         return False
-        
-    #     return True
-
+    
     def calc_fitness(self):
         # fitness function --> param --> path (position between node and target) , number of collectables, health and safe
         dist = math.sqrt((goal[0]-self.node.x)**2 + (goal[1]-self.node.y)**2)
-        wl = 1
-        wc = 25
-        wh = 1
+        lcs = []
+        lc = 0
+        les = []
+        le = 0
+        for l in list_collectables:
+            d = math.sqrt((l[0]-self.node.x)**2 + (l[1]-self.node.y)**2)
+            lcs.append(d)
+        if len(lcs) != 0:
+            lc = min(lcs)
+            
+        for e in list_enemies:
+            de = math.sqrt((e[0]-self.node.x)**2 + (e[1]-self.node.y)**2)
+            les.append(de)
+        if len(les) != 0:
+            le = min(les)
+            if le < 5:
+                if (self.health - 5) < 0:
+                    self.health = 0
+                else:
+                    self.health = self.health - 5   
+            
+        # print(lc)
+        wl = 20
+        wc = 0
+        wlc = 100
+        wh = 30
         ws = 1
+        wle = 10
         safe = 0 # function to be implemented to cal safe
-        self.fitness = (1/(wl*dist + ws*safe)) + wc*self.collected + wh*self.health
+        # self.fitness = (1/((wl*dist + ws*safe - wc*self.collected - wh*self.health + wlc*lc - wle*le) + 0.000000000000000001))
+        # self.fitness = (1/(wl*dist)) +  (1/(wlc*lc))
+        self.fitness = (1/((wl*dist + ws*safe + wlc*lc - wle*le)+ 0.000000000000000001) + wc*self.collected + wh*self.health)
 
 class GA:
     def __init__(self,a_star,population_size,elitism,crossover,mutation,num_iterations = 100):
@@ -77,6 +90,7 @@ class GA:
         self.population = []
         self.a_star = a_star
         self.firstRandomPopluation()
+        self.elitisms = []
         
     
     def firstRandomPopluation(self):
@@ -84,9 +98,14 @@ class GA:
             p = [0,0]
             p[0] = random.randint(1, 99)
             p[1] = random.randint(1, 99)
-            # print(p)
+            # print((p[0],p[1]))
+            # print(self.a_star.verify(AStarPlanner.Node(p[0],p[1],0,None,None)))
             if(self.a_star.verify(AStarPlanner.Node(p[0],p[1],0,None,None))):
-                chrom = Chromosome(AStarPlanner.Node(p[0],p[1],0,None,None))
+                chrom = None
+                if self.checkCollectable(p[0],p[1]):
+                    chrom = Chromosome(AStarPlanner.Node(p[0],p[1],1,None,None))
+                else:
+                    chrom = Chromosome(AStarPlanner.Node(p[0],p[1],0,None,None))
                 self.population.append(chrom)
             # print(len(self.population))
             
@@ -94,11 +113,24 @@ class GA:
         return population.fitness
     
     def elitism(self):
-        self.population.sort(key=self.sortByFitness)
-        return self.population[0:self.elitismNum]
+        self.population.sort(key=self.sortByFitness, reverse=True)
+        newChroms = []
+        for chrom in self.population[0:self.elitismNum]:
+            newChrom = Chromosome(chrom.node,chrom.collected,chrom.health) 
+            newChroms.append(newChrom)
+        if self.population[0] not in self.elitisms:
+            self.elitisms.append(self.population[0])
+        return newChroms
+            
+    
+    def checkNotInPopulation(self,chrom):
+        for x in self.population:
+            if chrom.node.x == x.node.x and chrom.node.y == x.node.y:
+                return False
+        return True
     
     def crossover(self):
-        self.population.sort(key=self.sortByFitness)
+        self.population.sort(key=self.sortByFitness, reverse=True)
         elite = self.population[0]
         crossoverList = []
         history = [] # for better results
@@ -112,16 +144,24 @@ class GA:
                 x1 = int((elite.node.x*alpha) + (cross.node.x*(1-alpha)))
                 y1 = int((elite.node.y*alpha) + (cross.node.y*(1-alpha)))
                 newNode1 = AStarPlanner.Node(x1,y1,0,None,None)
-                newCollection1 = int((elite.collected * alpha) + (cross.collected * (1-alpha)))
-                newHealth1 = int((elite.health * alpha) + (cross.health * (1-alpha)))
-                newChromosome1 = Chromosome(newNode1,newCollection1,newHealth1)
-                
+                # newCollection1 = int((elite.collected * alpha) + (cross.collected * (1-alpha)))
+                # newHealth1 = int((elite.health * alpha) + (cross.health * (1-alpha)))
+                newChromosome1 = None
+                if self.checkCollectable(x1,y1):
+                    newChromosome1 = Chromosome(newNode1,elite.collected + 1,elite.health)
+                else:
+                    newChromosome1 = Chromosome(newNode1,elite.collected,elite.health)
+                    
                 x2 = int((elite.node.x*(1-alpha)) + (cross.node.x*alpha))
                 y2 = int((elite.node.y*(1-alpha)) + (cross.node.y*alpha))
                 newNode2 = AStarPlanner.Node(x2,y2,0,None,None)
-                newCollection2 = int((elite.collected * (1-alpha)) + (cross.collected * alpha))
-                newHealth2 = int((elite.health * (1-alpha)) + (cross.health * alpha))
-                newChromosome2 = Chromosome(newNode2,newCollection2,newHealth2)
+                # newCollection2 = int((elite.collected * (1-alpha)) + (cross.collected * alpha))
+                # newHealth2 = int((elite.health * (1-alpha)) + (cross.health * alpha))   
+                newChromosome2 = None
+                if self.checkCollectable(x2,y2):
+                    newChromosome2 = Chromosome(newNode2,cross.collected + 1,cross.health)
+                else:
+                    newChromosome2 = Chromosome(newNode2,cross.collected,cross.health)
                 
                 if self.a_star.verify(newNode1) and len(crossoverList) < self.crossoverNum:
                     crossoverList.append(newChromosome1)
@@ -132,23 +172,47 @@ class GA:
         return crossoverList
     
     def mutation(self):
+        self.population.sort(key=self.sortByFitness, reverse=True)
         worstChrom = self.population[len(self.population) - 1]
         x = random.randint(1,99)
         y = random.randint(1,99)
         while not self.a_star.verify(AStarPlanner.Node(x,y,0,None,None)):
             x = random.randint(1,99)
             y = random.randint(1,99)
-        if (worstChrom.health + random.randint(0,100)) > 100:
-            worstChrom.health = 100 
-        else: 
-            worstChrom.health = worstChrom.health + random.randint(0,100)
-        return Chromosome(AStarPlanner.Node(x,y,0,None,None),worstChrom.collected,worstChrom.health)
+        if worstChrom.health == 0:
+            worstChrom.health = random.randint(5,100) 
+        # else: 
+        #     worstChrom.health = worstChrom.health + random.randint(0,100)
+        newChrome = None
+        if self.checkCollectable(x,y):
+            newChrome = Chromosome(AStarPlanner.Node(x,y,0,None,None),worstChrom.collected + 1,worstChrom.health)
+        else:
+            newChrome = Chromosome(AStarPlanner.Node(x,y,0,None,None),worstChrom.collected,worstChrom.health)
+        
+        return newChrome
+    
+    def checkCollectable(self,x,y):
+        if (x,y) in list_collectables:
+            list_collectables.remove((x,y))
+            return True
+        else:
+            return False
+        
+    def checkGoal(self):
+        for p in self.population:
+            if p.node.x == goal[0] and p.node.y == goal[1]:
+                return True
+        return False
         
     def runGA(self):
         plt.grid(True)
         plt.axis("equal")
-        for x in range(self.num_iterations):
-            print("inn")
+        # for x in range(self.num_iterations):
+        while True:
+            if len(list_collectables) == 0 and self.checkGoal():
+                print("finish")
+                break
+            # print("inn")
             e = self.elitism()
             c = self.crossover()
             m = self.mutation()
@@ -156,11 +220,95 @@ class GA:
             self.population += e
             self.population += c
             self.population.append(m)
-            print(len(self.population))
+            # print(len(self.population))
             if show_animation:  # pragma: no cover
                 for pos in (self.population):
+                    print(pos.health)
+                    # print(len(list_collectables))
                     plt.plot(pos.node.x, pos.node.y, c=next(cycol), marker="o")
-                plt.show()
+                
+                for x,y in list_collectables:
+                    plt.plot(x, y, c="b", marker="v")
+                for xe,ye in list_enemies:
+                    plt.plot(xe, ye, c="c", marker="*")
+                    
+            # plt.draw()
+            plt.pause(0.0001)
+            plt.clf()
+            ox, oy = [], []
+            i = 0
+            for i in range(0, 100):
+                ox.append(i)
+                oy.append(0)
+            for i in range(0, 100):
+                ox.append(100)
+                oy.append(i)
+            for i in range(0, 100):
+                ox.append(i)
+                oy.append(100)
+            for i in range(0, 100):
+                ox.append(0)
+                oy.append(i)
+            #3
+            #--
+            for i in range(5, 15):
+                ox.append(i)
+                oy.append(50.0)
+            # -1-
+            for i in range(0, 10):
+                ox.append(15)
+                oy.append(50 - i)
+            for i in range(5, 15):
+                ox.append(i)
+                oy.append(40.0)
+            for i in range(0, 10):
+                ox.append(15)
+                oy.append(40 - i)
+            for i in range(4, 15):
+                ox.append(i)
+                oy.append(30.0)
+            #7
+            #--
+            for i in range(20, 40):
+                ox.append(i)
+                oy.append(50.0)
+            #/
+            for i in range(0, 20):
+                ox.append(40 - i)
+                oy.append(50 - i)
+            #-
+            for i in range(40, 50):
+                ox.append(i)
+                oy.append(40.0)
+            #1
+            for i in range(0, 20):
+                ox.append(60)
+                oy.append(50 - i)
+            #7
+            #--
+            for i in range(70, 90):
+                ox.append(i)
+                oy.append(50.0)
+            #/
+            for i in range(0, 20):
+                ox.append(90 - i)
+                oy.append(50 - i)
+            if show_animation:  # pragma: no cover
+                plt.plot(ox, oy, ".k")
+                plt.plot(50, 50, c="r", marker="$g$")
+        
+        rx, ry = self.calc_final_path()
+
+        return rx, ry
+    
+    def calc_final_path(self):
+        rx = []
+        ry = []
+        for e in self.elitisms:
+            rx.append(e.node.x)
+            ry.append(e.node.y)
+        return rx, ry
+
                 
 class AStarPlanner:
 
@@ -402,7 +550,7 @@ def three(sx, sy, tlen):
         oy.append(30.0)
 
 def main():
-    print("start!!")
+    print(__file__ + " start!!")
 
     # set obstable positions
     ox, oy = [], []
@@ -462,6 +610,7 @@ def main():
     for i in range(0, 20):
         ox.append(90 - i)
         oy.append(50 - i)
+        
     sx = 70  # [m]
     sy = 70  # [m]
     list_pos = [(70, 70), (20, 20), (60, 60)]
@@ -469,7 +618,7 @@ def main():
     list_collectables = [(60, 80), (30, 30), (10,60)]
     gx = 50.0  # [m]
     gy = 50.0  # [m]
-    grid_size = 2.0  # [m]
+    grid_size = 1.0  # [m]
     robot_radius = 1.0  # [m]
     if show_animation:  # pragma: no cover
         plt.plot(ox, oy, ".k")
@@ -486,13 +635,15 @@ def main():
     # rx, ry = a_star.planning(gx, gy, list_pos, list_collectables)
     
     ga = GA(a_star,20,2,17,1)
-    ga.runGA()
-
-    # if show_animation:  # pragma: no cover
-    #     plt.plot(rx, ry, "-r")
-    #     plt.show()
+    rx, ry = ga.runGA()
+    
+    # print(rx, ry)
+        
+    if show_animation:  # pragma: no cover
+        plt.plot(rx, ry, "-r")
+        plt.show()
     
 
 
-
-main()
+if __name__ == '__main__':
+    main()
